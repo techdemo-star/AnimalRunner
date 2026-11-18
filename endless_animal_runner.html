@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>動物大冒險 - 射擊跑酷遊戲</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .font-pixel {
+      font-family: 'Press Start 2P', monospace;
+    }
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+    }
+    .animate-float {
+      animation: floatSlow 3s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 min-h-screen flex flex-col items-center justify-center p-2 sm:p-5">
+
+  <!-- 遊戲主容器 -->
+  <div id="game-wrapper" class="relative w-full max-w-[860px] h-[480px] sm:h-[500px] bg-sky-100 rounded-2xl shadow-2xl overflow-hidden border-4 border-slate-700">
+    
+    <!-- 遊戲主畫布 -->
+    <canvas id="gameCanvas" width="860" height="500" class="w-full h-full block cursor-crosshair"></canvas>
+
+    <!-- 頂部狀態列 (音效切換、排行榜、返回主選單、難度階段、強化狀態、分數板) -->
+    <div class="absolute top-3 left-3 right-3 sm:left-4 sm:right-4 flex items-center justify-between pointer-events-none z-20 gap-2">
+      <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto flex-wrap">
+        <button id="btn-mute" title="切換音效" class="bg-white/90 hover:bg-white text-slate-700 font-bold px-2.5 py-1.5 rounded-lg shadow text-xs sm:text-sm transition active:scale-95">
+          🔊 音效開
+        </button>
+        <button id="btn-open-leaderboard" title="查看全球排行榜與試算表設定" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-2.5 py-1.5 rounded-lg shadow text-xs sm:text-sm transition active:scale-95">
+          🏆 排行榜
+        </button>
+        <button id="btn-hud-menu" class="hidden bg-white/90 hover:bg-white text-slate-700 font-bold px-2.5 py-1.5 rounded-lg shadow text-xs sm:text-sm transition active:scale-95">
+          🏠 主選單
+        </button>
+        <span id="difficulty-badge" class="hidden bg-indigo-600/95 text-white font-bold px-2.5 py-1.5 rounded-lg shadow text-xs">
+          Lv.1 草原
+        </span>
+        <span id="buff-badge" class="hidden bg-amber-400 text-slate-950 font-black px-2.5 py-1.5 rounded-lg shadow text-xs animate-pulse">
+        </span>
+      </div>
+
+      <div id="score-board" class="bg-slate-900/85 text-white px-3.5 py-1.5 rounded-xl shadow flex items-center gap-3 sm:gap-4 font-pixel text-[11px] sm:text-xs shrink-0">
+        <div id="combo-display" class="hidden text-emerald-400">x1</div>
+        <div class="text-amber-300">HI <span id="high-score">00000</span></div>
+        <div id="current-score" class="text-white">00000</div>
+      </div>
+    </div>
+
+    <!-- 主選單覆蓋層 -->
+    <div id="start-screen" class="absolute inset-0 z-10 flex flex-col items-center justify-between py-4 px-3 sm:px-5 bg-gradient-to-b from-sky-200/75 via-white/65 to-transparent backdrop-blur-[2px]">
+      
+      <!-- 裝飾性飄浮元素 -->
+      <div class="absolute top-12 left-6 text-3xl opacity-80 animate-float pointer-events-none select-none">☁️</div>
+      <div class="absolute top-14 right-8 text-2xl opacity-80 animate-float pointer-events-none select-none" style="animation-delay: 1s;">🌤️</div>
+
+      <!-- 標題區 -->
+      <div class="text-center mt-7 sm:mt-8">
+        <div class="inline-block bg-amber-400 text-slate-900 text-[11px] font-black px-3 py-0.5 rounded-full mb-1 shadow-sm tracking-wider">
+          SUPER ARCADE SHOOTER RUNNER
+        </div>
+        <h1 id="game-main-title" class="font-pixel text-xl sm:text-3xl text-slate-800 drop-shadow-sm tracking-wide cursor-default">
+          ANIMAL RUNNER DX
+        </h1>
+      </div>
+
+      <!-- 中央選單卡片 -->
+      <div class="w-full max-w-2xl bg-white/95 rounded-2xl shadow-xl border-2 border-slate-200 p-3.5 sm:p-4 flex flex-col items-center">
+        <p class="text-slate-700 font-bold text-xs sm:text-sm mb-2.5">選擇冒險夥伴（6 種動物各有專屬武器特性）：</p>
+        
+        <!-- 6 種角色選擇列 -->
+        <div id="character-grid" class="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full mb-3">
+          <button data-char="dino" class="char-btn flex flex-col items-center p-2 rounded-xl border-2 border-blue-500 bg-blue-50 transition transform hover:scale-105">
+            <span class="text-2xl sm:text-3xl mb-0.5 inline-block -scale-x-100">🦖</span>
+            <span class="text-xs font-bold text-slate-800">小恐龍</span>
+            <span class="text-[10px] text-orange-600 font-bold">🔥 連發火球</span>
+          </button>
+
+          <button data-char="cat" class="char-btn flex flex-col items-center p-2 rounded-xl border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 transition transform hover:scale-105">
+            <span class="text-2xl sm:text-3xl mb-0.5 inline-block -scale-x-100">🐈</span>
+            <span class="text-xs font-bold text-slate-800">橘貓咪</span>
+            <span class="text-[10px] text-pink-600 font-bold">🧶 極速毛球</span>
+          </button>
+
+          <button data-char="dog" class="char-btn flex flex-col items-center p-2 rounded-xl border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 transition transform hover:scale-105">
+            <span class="text-2xl sm:text-3xl mb-0.5 inline-block -scale-x-100">🐕</span>
+            <span class="text-xs font-bold text-slate-800">柴犬君</span>
+            <span class="text-[10px] text-amber-700 font-bold">🦴 穿透骨頭</span>
+          </button>
+
+          <button data-char="bird" class="char-btn flex flex-col items-center p-2 rounded-xl border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 transition transform hover:scale-105">
+            <span class="text-2xl sm:text-3xl mb-0.5 inline-block -scale-x-100">🐦</span>
+            <span class="text-xs font-bold text-slate-800">小飛鳥</span>
+            <span class="text-[10px] text-sky-600 font-bold">💨 雙重旋風</span>
+          </button>
+
+          <button data-char="fox" class="char-btn flex flex-col items-center p-2 rounded-xl border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 transition transform hover:scale-105">
+            <span class="text-2xl sm:text-3xl mb-0.5 inline-block -scale-x-100">🦊</span>
+            <span class="text-xs font-bold text-slate-800">靈狐仙</span>
+            <span class="text-[10px] text-purple-600 font-bold">⚡ 雷電連射</span>
+          </button>
+
+          <button data-char="panda" class="char-btn flex flex-col items-center p-2 rounded-xl border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 transition transform hover:scale-105">
+            <span class="text-2xl sm:text-3xl mb-0.5 inline-block -scale-x-100">🐼</span>
+            <span class="text-xs font-bold text-slate-800">功夫熊貓</span>
+            <span class="text-[10px] text-emerald-700 font-bold">🎋 重砲竹筍</span>
+          </button>
+        </div>
+
+        <!-- 操作與新元素圖鑑說明 -->
+        <div class="w-full bg-slate-100 rounded-xl px-2.5 py-2 text-[11px] text-slate-600 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mb-2.5">
+          <span><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-bold text-slate-800">空白鍵 / ↑</kbd> 二段跳</span>
+          <span><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-bold text-slate-800">↓</kbd> 蹲下/俯衝</span>
+          <span><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-bold text-rose-600">Z / 點擊</kbd> 射擊</span>
+          <span class="text-indigo-700 font-bold">🎁 道具：🛡️護盾 / 🔥散射 / 🧲磁鐵 / 🛢️炸藥桶</span>
+        </div>
+
+        <!-- 玩家暱稱與開始遊戲按鈕列 -->
+        <div class="w-full flex flex-col sm:flex-row items-center justify-center gap-2">
+          <div class="flex items-center bg-slate-100 border-2 border-slate-200 focus-within:border-blue-500 rounded-xl px-3 py-1.5 w-full sm:w-56">
+            <span class="text-xs font-bold text-slate-500 mr-1.5 shrink-0">暱稱</span>
+            <input id="player-nickname-input" type="text" maxlength="12" placeholder="輸入玩家暱稱" class="bg-transparent text-xs sm:text-sm font-bold text-slate-800 w-full focus:outline-none" />
+          </div>
+          <button id="btn-start" class="w-full sm:w-56 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-pixel text-xs sm:text-sm py-3 px-5 rounded-xl shadow-lg shadow-blue-600/30 transition transform hover:-translate-y-0.5 active:translate-y-0 shrink-0">
+            START GAME
+          </button>
+        </div>
+      </div>
+
+      <!-- 底部保留空間讓後方草地與角色奔跑動畫完整露出 -->
+      <div class="h-10 sm:h-12 pointer-events-none"></div>
+    </div>
+
+    <!-- 遊戲結束覆蓋層 -->
+    <div id="gameover-screen" class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900/65 backdrop-blur-sm p-4">
+      <div class="bg-white rounded-2xl shadow-2xl border-2 border-slate-200 p-5 sm:p-6 max-w-md w-full text-center">
+        <div class="text-4xl mb-1.5">💥</div>
+        <h2 class="font-pixel text-xl sm:text-2xl text-rose-600 mb-3">GAME OVER</h2>
+        
+        <div class="bg-slate-100 rounded-xl p-3 mb-4 space-y-1.5 text-sm">
+          <div class="text-slate-600">本次得分：<span id="final-score" class="font-bold text-slate-900 text-lg">0</span></div>
+          <div class="text-xs text-slate-500 flex justify-center gap-4">
+            <span>擊敗敵人：<strong id="final-kills" class="text-emerald-600">0</strong></span>
+            <span>最高連擊：<strong id="final-combo" class="text-amber-600">x1</strong></span>
+          </div>
+          <div class="text-xs text-indigo-600 font-bold" id="final-stage">抵達階段：Lv.1 草原</div>
+          <div id="sync-status-msg" class="text-[11px] font-bold text-slate-500 pt-1 border-t border-slate-200">
+            ⏳ 正在結算成績...
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2">
+          <button id="btn-restart" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-2 rounded-xl shadow text-xs sm:text-sm transition active:scale-95">
+            🔄 再玩一次
+          </button>
+          <button id="btn-gameover-board" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold py-2.5 px-2 rounded-xl shadow text-xs sm:text-sm transition active:scale-95">
+            🏆 排行榜
+          </button>
+          <button id="btn-back-menu" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2.5 px-2 rounded-xl text-xs sm:text-sm transition active:scale-95">
+            🏠 回到選單
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Google 試算表全球排行榜視窗 -->
+    <div id="leaderboard-modal" class="hidden absolute inset-0 z-30 flex items-center justify-center bg-slate-900/75 backdrop-blur-sm p-3 sm:p-4">
+      <div class="bg-white rounded-2xl shadow-2xl border-2 border-slate-200 w-full max-w-xl max-h-[92%] flex flex-col overflow-hidden">
+        <!-- 視窗標題列 -->
+        <div class="flex items-center justify-between px-4 py-3 bg-slate-800 text-white shrink-0">
+          <div class="flex items-center gap-2">
+            <span id="leaderboard-secret-trigger" class="text-xl cursor-default select-none">🏆</span>
+            <h3 class="font-bold text-sm sm:text-base">全球冒險者排行榜 (Top 100)</h3>
+          </div>
+          <button id="btn-close-leaderboard" class="text-slate-300 hover:text-white font-bold px-2 py-1 rounded-lg hover:bg-slate-700 transition">
+            ✕
+          </button>
+        </div>
+
+        <!-- 排行榜內容 -->
+        <div class="p-3 sm:p-4 overflow-y-auto flex-1 space-y-3">
+          <div class="flex items-center justify-between gap-2 bg-slate-100 px-3 py-2 rounded-xl text-xs">
+            <span id="sheet-conn-status" class="font-bold text-emerald-700">🟢 已連線至 Google 試算表</span>
+            <button id="btn-refresh-board" class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold px-2.5 py-1 rounded-lg shadow-sm active:scale-95 shrink-0">
+              🔄 刷新
+            </button>
+          </div>
+
+          <div class="overflow-hidden rounded-xl border border-slate-200">
+            <table class="w-full text-left border-collapse text-xs sm:text-sm">
+              <thead>
+                <tr class="bg-slate-100 text-slate-600 border-b border-slate-200">
+                  <th class="py-2 px-3 w-14 text-center">名次</th>
+                  <th class="py-2 px-2">玩家與角色</th>
+                  <th class="py-2 px-2 hidden sm:table-cell">抵達關卡</th>
+                  <th class="py-2 px-3 text-right">得分</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-tbody" class="divide-y divide-slate-100">
+                <!-- 由 JS 動態填入排名資料 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 隱藏管理視窗：Google 試算表串接與後端腳本設定 -->
+    <div id="admin-modal" class="hidden absolute inset-0 z-40 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-3 sm:p-4">
+      <div class="bg-white rounded-2xl shadow-2xl border-2 border-slate-200 w-full max-w-xl max-h-[92%] flex flex-col overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 bg-slate-900 text-white shrink-0">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">⚙️</span>
+            <h3 class="font-bold text-sm sm:text-base">管理後台：Google 試算表串接設定</h3>
+          </div>
+          <button id="btn-close-admin" class="text-slate-300 hover:text-white font-bold px-2 py-1 rounded-lg hover:bg-slate-700 transition">
+            ✕
+          </button>
+        </div>
+
+        <div class="p-3 sm:p-4 overflow-y-auto flex-1 space-y-3 text-xs text-slate-700">
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1.5">
+            <div class="font-bold text-blue-900 text-sm">🔗 目前使用的 Google 試算表 Apps Script 網址：</div>
+            <div class="flex gap-2">
+              <input id="sheet-url-input" type="text" placeholder="貼上 https://script.google.com/macros/s/.../exec" class="flex-1 bg-white border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-blue-600" />
+              <button id="btn-apply-sheet-url" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg shrink-0">
+                套用連線
+              </button>
+            </div>
+            <div id="url-apply-feedback" class="text-[11px] font-bold text-emerald-700">
+              ✅ 已內建預設試算表連線網址，每次遊玩皆會獨立記錄並保留前 100 名。
+            </div>
+          </div>
+
+          <div class="space-y-1.5 bg-slate-50 border border-slate-200 rounded-xl p-3">
+            <div class="font-bold text-slate-800 text-xs sm:text-sm">🚀 上線到 GitHub Pages + Google 試算表 4 步驟指南（僅保留前 100 名）：</div>
+            <ol class="list-decimal list-inside space-y-1.5 text-slate-600 leading-relaxed">
+              <li><strong>建立 Google 試算表</strong>：前往 <a href="https://sheets.new" target="_blank" class="text-blue-600 underline font-bold">Google 試算表</a> 建立新試算表，將左下角工作表名稱改為 <code class="bg-slate-200 px-1 rounded font-bold text-slate-800">Leaderboard</code>。</li>
+              <li><strong>部署免費後端腳本（Apps Script）</strong>：複製下方程式碼，回到試算表點選上方選單 <strong>擴充功能 → Apps Script</strong>，清空預設內容後貼上並存檔。點擊右上角 <strong>部署 → 新增部署</strong>（若是更新既有腳本，請點 <strong>管理部署 → 編輯 → 版本選「建立新版本」</strong>）→ 類型選 <strong>網頁應用程式</strong> → 誰可以存取務必選 <strong>所有人 (Anyone)</strong> → 授權後複製產生的 <code class="bg-slate-200 px-1 rounded text-slate-800">.../exec</code> 網址。</li>
+              <li><strong>填入網址並測試連線</strong>：在上方輸入框貼上該網址並點擊「套用連線」即可即時測試；若要永久生效，請打開 <code class="bg-slate-200 px-1 rounded font-bold text-slate-800">index.html</code> 找到 <code class="bg-slate-200 px-1 rounded text-slate-800">let GOOGLE_SHEET_API_URL = "...";</code>，將網址貼入雙引號內儲存。</li>
+              <li><strong>發布到 GitHub Pages</strong>：在 GitHub 建立一個公開儲存庫（Repository），上傳 <code class="bg-slate-200 px-1 rounded font-bold text-slate-800">index.html</code>，前往 <strong>Settings → Pages</strong> 選擇 <code class="bg-slate-200 px-1 rounded text-slate-800">main</code> 分支並儲存，稍候數十秒即可取得專屬公開網址分享遊玩！</li>
+            </ol>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-800">Google Apps Script 後端程式碼（支援單次獨立記錄＋Top 100 上限）：</span>
+              <button id="btn-copy-gas" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2.5 py-1 rounded-lg text-xs transition active:scale-95">
+                📋 一鍵複製程式碼
+              </button>
+            </div>
+            <textarea id="gas-code-box" readonly rows="8" class="w-full font-mono text-[11px] bg-slate-900 text-emerald-300 p-2.5 rounded-xl focus:outline-none">function doGet(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Leaderboard');
+  if (!sheet) return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: '找不到 Leaderboard 工作表' })).setMimeType(ContentService.MimeType.JSON);
+  var rows = sheet.getDataRange().getValues();
+  var list = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0]) {
+      list.push({
+        playerId: String(rows[i][0]),
+        nickname: String(rows[i][1]),
+        charEmoji: String(rows[i][2]),
+        score: Number(rows[i][3]) || 0,
+        stage: String(rows[i][4] || 'Lv.1 草原')
+      });
+    }
+  }
+  list.sort(function(a, b) { return b.score - a.score; });
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ok', leaderboard: list.slice(0, 100) })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Leaderboard');
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['recordId', 'nickname', 'charEmoji', 'score', 'stage', 'updatedAt']);
+  }
+  var data = JSON.parse(e.postData.contents);
+  var nowStr = new Date().toLocaleString('zh-TW');
+  var recordId = String(data.recordId || data.playerId || ('run_' + new Date().getTime()));
+  sheet.appendRow([recordId, data.nickname, data.charEmoji, Number(data.score) || 0, data.stage, nowStr]);
+
+  var rows = sheet.getDataRange().getValues();
+  var allRecords = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0]) {
+      allRecords.push(rows[i]);
+    }
+  }
+  allRecords.sort(function(a, b) { return (Number(b[3]) || 0) - (Number(a[3]) || 0); });
+  var top100 = allRecords.slice(0, 100);
+
+  if (rows.length > 1) {
+    sheet.getRange(2, 1, rows.length - 1, 6).clearContent();
+  }
+  if (top100.length > 0) {
+    sheet.getRange(2, 1, top100.length, 6).setValues(top100);
+  }
+  return doGet(e);
+}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 手機版 / 觸控操作列 -->
+  <div id="mobile-controls" class="w-full max-w-[860px] mt-2.5 grid grid-cols-3 gap-2.5 sm:hidden">
+    <button id="touch-duck" class="bg-slate-700 active:bg-slate-600 text-white font-bold py-3.5 rounded-xl shadow-lg text-sm">
+      ⬇️ 蹲下
+    </button>
+    <button id="touch-shoot" class="bg-rose-600 active:bg-rose-500 text-white font-bold py-3.5 rounded-xl shadow-lg text-sm">
+      🔥 射擊
+    </button>
+    <button id="touch-jump" class="bg-blue-600 active:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg text-sm">
+      ⬆️ 跳躍 (二段)
+    </button>
+  </div>
+
+  <script>
+    /**
+     * =========================================================================
+     * 【GitHub Pages + Google 試算表排行榜設定區】
+     * 已直接寫入指定的 Google Apps Script 網頁應用程式網址 (/exec)
+     * =========================================================================
+     */
+    let GOOGLE_SHEET_API_URL = "https://script.google.com/macros/s/AKfycbx0ABGr7snLzibyyY6pRyEneWb3Y3HqIxkmsle97_a2raumQtug8YgZS18Oe2KVQqQV/exec";
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // UI DOM 元素參考
+    const startScreen = document.getElementById('start-screen');
+    const gameoverScreen = document.getElementById('gameover-screen');
+    const btnStart = document.getElementById('btn-start');
+    const btnRestart = document.getElementById('btn-restart');
+    const btnBackMenu = document.getElementById('btn-back-menu');
+    const btnHudMenu = document.getElementById('btn-hud-menu');
+    const btnMute = document.getElementById('btn-mute');
+    const btnOpenLeaderboard = document.getElementById('btn-open-leaderboard');
+    const btnGameoverBoard = document.getElementById('btn-gameover-board');
+    const btnCloseLeaderboard = document.getElementById('btn-close-leaderboard');
+    const leaderboardModal = document.getElementById('leaderboard-modal');
+    const adminModal = document.getElementById('admin-modal');
+    const btnCloseAdmin = document.getElementById('btn-close-admin');
+    const gameMainTitle = document.getElementById('game-main-title');
+    const leaderboardSecretTrigger = document.getElementById('leaderboard-secret-trigger');
+    const leaderboardTbody = document.getElementById('leaderboard-tbody');
+    const sheetConnStatus = document.getElementById('sheet-conn-status');
+    const btnRefreshBoard = document.getElementById('btn-refresh-board');
+    const sheetUrlInput = document.getElementById('sheet-url-input');
+    const btnApplySheetUrl = document.getElementById('btn-apply-sheet-url');
+    const urlApplyFeedback = document.getElementById('url-apply-feedback');
+    const btnCopyGas = document.getElementById('btn-copy-gas');
+    const gasCodeBox = document.getElementById('gas-code-box');
+    const playerNicknameInput = document.getElementById('player-nickname-input');
+    const syncStatusMsg = document.getElementById('sync-status-msg');
+    const difficultyBadge = document.getElementById('difficulty-badge');
+    const buffBadge = document.getElementById('buff-badge');
+    const comboDisplay = document.getElementById('combo-display');
+    const currentScoreEl = document.getElementById('current-score');
+    const highScoreEl = document.getElementById('high-score');
+    const finalScoreEl = document.getElementById('final-score');
+    const finalKillsEl = document.getElementById('final-kills');
+    const finalComboEl = document.getElementById('final-combo');
+    const finalStageEl = document.getElementById('final-stage');
+    const charButtons = document.querySelectorAll('.char-btn');
+
+    // 玩家本機識別碼、單局紀錄集合與預設暱稱
+    const sessionPlayerId = 'player_' + Math.random().toString(36).substring(2, 10);
+    const myRunIds = new Set();
+    const defaultNickname = '冒險動物#' + Math.floor(1000 + Math.random() * 9000);
+    playerNicknameInput.value = defaultNickname;
+
+    // 離線展示用排行榜
+    let cachedLeaderboard = [
+      { playerId: 'demo_1', nickname: '暴龍王阿凱', charEmoji: '🦖', score: 1680, stage: 'Lv.MAX 修羅' },
+      { playerId: 'demo_2', nickname: '極速橘貓',   charEmoji: '🐈', score: 1240, stage: 'Lv.5 修羅' },
+      { playerId: 'demo_3', nickname: '功夫大師',   charEmoji: '🐼', score: 920,  stage: 'Lv.4 狂潮' },
+      { playerId: 'demo_4', nickname: '九尾靈狐',   charEmoji: '🦊', score: 650,  stage: 'Lv.3 暗夜' },
+      { playerId: 'demo_5', nickname: '神犬柴柴',   charEmoji: '🐕', score: 410,  stage: 'Lv.2 荒野' }
+    ];
+
+    // 六種動物角色設定與專屬武器屬性
+    const CHARACTERS = {
+      dino:  { emoji: '🦖', bullet: '🔥', cooldown: 280, damage: 1, pierce: false, dual: false, name: '小恐龍' },
+      cat:   { emoji: '🐈', bullet: '🧶', cooldown: 210, damage: 1, pierce: false, dual: false, name: '橘貓咪' },
+      dog:   { emoji: '🐕', bullet: '🦴', cooldown: 330, damage: 1, pierce: true,  dual: false, name: '柴犬君' },
+      bird:  { emoji: '🐦', bullet: '💨', cooldown: 340, damage: 1, pierce: false, dual: true,  name: '小飛鳥' },
+      fox:   { emoji: '🦊', bullet: '⚡', cooldown: 190, damage: 1, pierce: false, dual: false, name: '靈狐仙' },
+      panda: { emoji: '🐼', bullet: '🎋', cooldown: 400, damage: 2, pierce: false, dual: false, name: '功夫熊貓' }
+    };
+
+    let selectedCharKey = 'dino';
+    let gameState = 'MENU';
+    let isMuted = false;
+
+    // 離屏畫布快取 Emoji 圖像，確保角色與怪物永遠清晰不透明
+    const emojiSpriteCache = {};
+    function getEmojiSprite(emoji, size, flipX = false) {
+      const key = `${emoji}_${size}_${flipX}`;
+      if (emojiSpriteCache[key]) return emojiSpriteCache[key];
+
+      const off = document.createElement('canvas');
+      const pad = 16;
+      off.width = size + pad * 2;
+      off.height = size + pad * 2;
+      const octx = off.getContext('2d');
+      octx.clearRect(0, 0, off.width, off.height);
+      octx.globalAlpha = 1;
+      octx.font = `${size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+      octx.textAlign = 'center';
+      octx.textBaseline = 'middle';
+
+      octx.save();
+      octx.translate(off.width / 2, off.height / 2);
+      if (flipX) octx.scale(-1, 1);
+      octx.fillText(emoji, 0, 2);
+      octx.restore();
+
+      emojiSpriteCache[key] = off;
+      return off;
+    }
+
+    function getPlayerNickname() {
+      const raw = playerNicknameInput.value.trim();
+      return raw ? raw.slice(0, 12) : defaultNickname;
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    // 渲染排行榜表格（顯示前 100 名）
+    function renderLeaderboardTable(list) {
+      const sorted = [...list].sort((a, b) => b.score - a.score).slice(0, 100);
+      if (sorted.length === 0) {
+        leaderboardTbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-slate-400">目前尚無紀錄，快來搶下第一名！</td></tr>';
+        return;
+      }
+      leaderboardTbody.innerHTML = sorted.map((item, idx) => {
+        const rankIcon = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `#${idx + 1}`));
+        const isMe = myRunIds.has(item.playerId) || String(item.playerId).startsWith(sessionPlayerId);
+        return `
+          <tr class="${isMe ? 'bg-blue-50/90 font-bold' : 'hover:bg-slate-50'}">
+            <td class="py-2 px-3 text-center font-bold text-slate-700">${rankIcon}</td>
+            <td class="py-2 px-2">
+              <div class="flex items-center gap-1.5">
+                <span class="text-lg inline-block -scale-x-100">${item.charEmoji || '🦖'}</span>
+                <span class="text-slate-800 truncate max-w-[120px] sm:max-w-[160px]">${escapeHtml(item.nickname)}</span>
+                ${isMe ? '<span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded">本次</span>' : ''}
+              </div>
+            </td>
+            <td class="py-2 px-2 text-xs text-indigo-600 font-semibold hidden sm:table-cell">${escapeHtml(item.stage || 'Lv.1 草原')}</td>
+            <td class="py-2 px-3 text-right font-pixel text-xs text-slate-900">${Math.floor(item.score)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 從 Google 試算表讀取最新 Top 100 排行榜
+    async function fetchLeaderboard() {
+      if (!GOOGLE_SHEET_API_URL) {
+        sheetConnStatus.textContent = '🟡 展示模式（尚未設定試算表網址）';
+        sheetConnStatus.className = 'font-bold text-amber-700';
+        renderLeaderboardTable(cachedLeaderboard);
+        return;
+      }
+
+      sheetConnStatus.textContent = '⏳ 正在同步 Google 試算表資料...';
+      sheetConnStatus.className = 'font-bold text-blue-600';
+
+      try {
+        const res = await fetch(GOOGLE_SHEET_API_URL);
+        const data = await res.json();
+        if (data.status === 'ok' && Array.isArray(data.leaderboard)) {
+          cachedLeaderboard = data.leaderboard.sort((a, b) => b.score - a.score).slice(0, 100);
+          sheetConnStatus.textContent = `🟢 已即時連線至 Google 試算表（目前共 ${cachedLeaderboard.length} 筆紀錄）`;
+          sheetConnStatus.className = 'font-bold text-emerald-700';
+          renderLeaderboardTable(cachedLeaderboard);
+
+          const myBest = cachedLeaderboard
+            .filter(r => myRunIds.has(r.playerId) || String(r.playerId).startsWith(sessionPlayerId))
+            .reduce((max, r) => Math.max(max, Number(r.score) || 0), 0);
+          if (myBest > highScore) {
+            highScore = myBest;
+            highScoreEl.textContent = String(highScore).padStart(5, '0');
+          }
+        } else {
+          throw new Error(data.message || '資料格式錯誤');
+        }
+      } catch (err) {
+        sheetConnStatus.textContent = '🔴 連線失敗，請檢查網路或管理後台設定';
+        sheetConnStatus.className = 'font-bold text-rose-600';
+        renderLeaderboardTable(cachedLeaderboard);
+      }
+    }
+
+    // 每次遊玩結束皆獨立寫入一筆新紀錄，並只保留前 100 名
+    async function submitScoreToSheet(finalScoreVal, stageLabel) {
+      const nickname = getPlayerNickname();
+      const charEmoji = CHARACTERS[selectedCharKey].emoji;
+      const runId = `${sessionPlayerId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      myRunIds.add(runId);
+
+      // 先於前端加入本局新紀錄並裁切保留前 100 名
+      cachedLeaderboard.push({
+        playerId: runId,
+        nickname,
+        charEmoji,
+        score: finalScoreVal,
+        stage: stageLabel
+      });
+      cachedLeaderboard.sort((a, b) => b.score - a.score);
+      const madeTop100 = cachedLeaderboard.slice(0, 100).some(r => r.playerId === runId);
+      cachedLeaderboard = cachedLeaderboard.slice(0, 100);
+      renderLeaderboardTable(cachedLeaderboard);
+
+      if (!GOOGLE_SHEET_API_URL) {
+        syncStatusMsg.textContent = '💡 目前為展示模式';
+        syncStatusMsg.className = 'text-[11px] font-bold text-amber-700 pt-1 border-t border-slate-200';
+        return;
+      }
+
+      if (!madeTop100 && cachedLeaderboard.length >= 100) {
+        syncStatusMsg.textContent = '📊 本局分數未進入前 100 名，未寫入排行榜';
+        syncStatusMsg.className = 'text-[11px] font-bold text-slate-500 pt-1 border-t border-slate-200';
+        return;
+      }
+
+      syncStatusMsg.textContent = '⏳ 正在將本局成績記錄至 Google 試算表...';
+      syncStatusMsg.className = 'text-[11px] font-bold text-blue-600 pt-1 border-t border-slate-200';
+
+      try {
+        const res = await fetch(GOOGLE_SHEET_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            playerId: runId,
+            recordId: runId,
+            nickname,
+            charEmoji,
+            score: finalScoreVal,
+            stage: stageLabel
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'ok' && Array.isArray(data.leaderboard)) {
+          cachedLeaderboard = data.leaderboard.sort((a, b) => b.score - a.score).slice(0, 100);
+          renderLeaderboardTable(cachedLeaderboard);
+        }
+        syncStatusMsg.textContent = '✅ 本局成績已獨立記錄至 Google 試算表（保留前 100 名）！';
+        syncStatusMsg.className = 'text-[11px] font-bold text-emerald-600 pt-1 border-t border-slate-200';
+      } catch (err) {
+        syncStatusMsg.textContent = '⚠️ 試算表上傳失敗，請確認網路或 Apps Script 權限';
+        syncStatusMsg.className = 'text-[11px] font-bold text-rose-600 pt-1 border-t border-slate-200';
+      }
+    }
+
+    // Web Audio 8-bit 音效合成器
+    const AudioSys = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      },
+      play(type) {
+        if (isMuted) return;
+        this.init();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        const now = this.ctx.currentTime;
+
+        if (type === 'jump') {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(280, now);
+          osc.frequency.exponentialRampToValueAtTime(600, now + 0.13);
+          gain.gain.setValueAtTime(0.07, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+          osc.start(now);
+          osc.stop(now + 0.13);
+        } else if (type === 'doublejump') {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(420, now);
+          osc.frequency.exponentialRampToValueAtTime(840, now + 0.13);
+          gain.gain.setValueAtTime(0.07, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+          osc.start(now);
+          osc.stop(now + 0.13);
+        } else if (type === 'shoot') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(740, now);
+          osc.frequency.exponentialRampToValueAtTime(190, now + 0.11);
+          gain.gain.setValueAtTime(0.07, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+          osc.start(now);
+          osc.stop(now + 0.11);
+        } else if (type === 'coin') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(980, now);
+          osc.frequency.setValueAtTime(1320, now + 0.06);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+          osc.start(now);
+          osc.stop(now + 0.16);
+        } else if (type === 'powerup') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.linearRampToValueAtTime(880, now + 0.22);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+          osc.start(now);
+          osc.stop(now + 0.22);
+        } else if (type === 'boom') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(140, now);
+          osc.frequency.exponentialRampToValueAtTime(35, now + 0.32);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+          osc.start(now);
+          osc.stop(now + 0.32);
+        } else if (type === 'hit') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(180, now);
+          osc.frequency.exponentialRampToValueAtTime(65, now + 0.14);
+          gain.gain.setValueAtTime(0.11, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+          osc.start(now);
+          osc.stop(now + 0.14);
+        } else if (type === 'clang') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(920, now);
+          osc.frequency.exponentialRampToValueAtTime(420, now + 0.08);
+          gain.gain.setValueAtTime(0.07, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'shield_break') {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(140, now + 0.25);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === 'gameover') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(300, now);
+          osc.frequency.linearRampToValueAtTime(85, now + 0.45);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+          osc.start(now);
+          osc.stop(now + 0.45);
+        }
+      }
+    };
+
+    // 世界與遊戲狀態變數
+    const GROUND_Y = 432;
+    let gameSpeed = 6.2;
+    let score = 0;
+    let highScore = 0;
+    let kills = 0;
+    let combo = 0;
+    let maxCombo = 0;
+    let frameCount = 0;
+    let screenShake = 0;
+
+    // 裝飾背景物件
+    const clouds = [
+      { x: 110, y: 75, speed: 0.4, scale: 1.1 },
+      { x: 400, y: 55, speed: 0.25, scale: 0.85 },
+      { x: 690, y: 92, speed: 0.5, scale: 1.2 }
+    ];
+
+    const mountains = [
+      { x: 0, w: 270, h: 115 },
+      { x: 230, w: 330, h: 150 },
+      { x: 520, w: 290, h: 105 },
+      { x: 760, w: 310, h: 140 }
+    ];
+
+    const stars = Array.from({ length: 28 }, () => ({
+      x: Math.random() * 860,
+      y: 25 + Math.random() * 210,
+      r: 1 + Math.random() * 1.8,
+      twinkle: Math.random() * Math.PI * 2
+    }));
+
+    const groundPebbles = Array.from({ length: 20 }, (_, i) => ({
+      x: i * 48 + Math.random() * 20,
+      y: GROUND_Y + 12 + Math.random() * 38,
+      w: 6 + Math.random() * 10
+    }));
+
+    // 玩家物件（含二段跳、護盾、三向散射、磁鐵強化）
+    const player = {
+      x: 92,
+      y: GROUND_Y - 54,
+      w: 54,
+      h: 54,
+      vy: 0,
+      gravity: 0.72,
+      jumpPower: -13.8,
+      isGrounded: true,
+      jumpCount: 0,
+      maxJumps: 2,
+      isDucking: false,
+      lastShotTime: 0,
+      hasShield: false,
+      tripleShotTimer: 0,
+      magnetTimer: 0,
+      invincibleTimer: 0,
+
+      reset() {
+        this.y = GROUND_Y - 54;
+        this.vy = 0;
+        this.isGrounded = true;
+        this.jumpCount = 0;
+        this.isDucking = false;
+        this.hasShield = false;
+        this.tripleShotTimer = 0;
+        this.magnetTimer = 0;
+        this.invincibleTimer = 0;
+      },
+
+      jump() {
+        if (this.isDucking) this.isDucking = false;
+        if (this.jumpCount < this.maxJumps) {
+          this.vy = this.jumpCount === 0 ? this.jumpPower : this.jumpPower * 0.9;
+          this.isGrounded = false;
+          this.jumpCount++;
+          AudioSys.play(this.jumpCount === 1 ? 'jump' : 'doublejump');
+          spawnParticles(this.x + this.w / 2, this.y + this.h, this.jumpCount === 2 ? '#38bdf8' : '#94a3b8', 7);
+        }
+      },
+
+      setDuck(ducking) {
+        if (gameState !== 'PLAYING') return;
+        this.isDucking = ducking;
+        if (ducking && !this.isGrounded) {
+          this.vy += 4.5;
+        }
+      },
+
+      shoot() {
+        if (gameState !== 'PLAYING') return;
+        const charData = CHARACTERS[selectedCharKey];
+        const now = performance.now();
+        if (now - this.lastShotTime < charData.cooldown) return;
+        this.lastShotTime = now;
+
+        const baseY = this.isDucking ? GROUND_Y - 20 : this.y + this.h / 2;
+        const baseX = this.x + this.w - 4;
+
+        const createBullet = (offsetY, vy) => {
+          bullets.push({
+            x: baseX,
+            y: baseY + offsetY,
+            vx: 14,
+            vy: vy,
+            r: 14,
+            emoji: charData.bullet,
+            damage: charData.damage,
+            pierce: charData.pierce,
+            hitIds: new Set()
+          });
+        };
+
+        if (this.tripleShotTimer > 0) {
+          createBullet(-12, -1.8);
+          createBullet(0, 0);
+          createBullet(12, 1.8);
+        } else if (charData.dual) {
+          createBullet(-11, 0);
+          createBullet(11, 0);
+        } else {
+          createBullet(0, 0);
+        }
+
+        AudioSys.play('shoot');
+      },
+
+      update() {
+        if (gameState === 'MENU') {
+          this.y = (GROUND_Y - 54) - Math.abs(Math.sin(frameCount * 0.13)) * 8;
+          return;
+        }
+
+        if (this.tripleShotTimer > 0) this.tripleShotTimer--;
+        if (this.magnetTimer > 0) this.magnetTimer--;
+        if (this.invincibleTimer > 0) this.invincibleTimer--;
+
+        this.vy += this.gravity;
+        this.y += this.vy;
+
+        const currentHeight = this.isDucking ? 34 : 54;
+        if (this.y + currentHeight >= GROUND_Y) {
+          if (!this.isGrounded) {
+            spawnParticles(this.x + this.w / 2, GROUND_Y, '#94a3b8', 5);
+          }
+          this.y = GROUND_Y - currentHeight;
+          this.vy = 0;
+          this.isGrounded = true;
+          this.jumpCount = 0;
+        }
+      },
+
+      draw() {
+        const charData = CHARACTERS[selectedCharKey];
+        const currentHeight = this.isDucking ? 34 : 54;
+        const drawY = (gameState === 'MENU') ? this.y : (this.isDucking ? GROUND_Y - 34 : this.y);
+
+        // 1. 繪製腳底地面陰影
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.ellipse(this.x + this.w / 2, GROUND_Y + 3, this.isDucking ? 26 : 20, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 2. 繪製磁鐵光環
+        if (this.magnetTimer > 0 && gameState === 'PLAYING') {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(244, 63, 94, 0.45)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.arc(this.x + this.w / 2, drawY + currentHeight / 2, 42 + Math.sin(frameCount * 0.2) * 4, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // 3. 使用離屏清晰快取繪製動物角色本體（確保 100% 飽和不透明）
+        const sprite = getEmojiSprite(charData.emoji, 48, true);
+        const bounce = (this.isGrounded && gameState === 'PLAYING') ? Math.sin(frameCount * 0.38) * 2.5 : 0;
+
+        ctx.save();
+        ctx.globalAlpha = (this.invincibleTimer > 0 && Math.floor(frameCount / 3) % 2 === 0) ? 0.55 : 1.0;
+        ctx.translate(this.x + this.w / 2, drawY + currentHeight / 2 + bounce);
+        if (this.isDucking) {
+          ctx.scale(1.12, 0.68);
+        }
+        ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
+        ctx.restore();
+
+        // 4. 繪製能量護盾泡泡
+        if (this.hasShield && gameState === 'PLAYING') {
+          ctx.save();
+          ctx.strokeStyle = '#38bdf8';
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(this.x + this.w / 2, drawY + currentHeight / 2, 34, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+      },
+
+      getHitbox() {
+        const h = this.isDucking ? 30 : 46;
+        const y = this.isDucking ? GROUND_Y - 30 : this.y + 4;
+        return {
+          x: this.x + 11,
+          y: y,
+          w: this.w - 22,
+          h: h - 4
+        };
+      }
+    };
+
+    // 動態實體陣列
+    let bullets = [];
+    let enemyProjectiles = [];
+    let entities = [];
+    let collectibles = [];
+    let particles = [];
+    let floatingTexts = [];
+    let spawnTimer = 0;
+    let entityUidCounter = 1;
+
+    function spawnParticles(x, y, color, count = 8) {
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x,
+          y,
+          vx: (Math.random() - 0.5) * 7.5,
+          vy: (Math.random() - 0.85) * 6.5,
+          size: 3 + Math.random() * 4,
+          color,
+          life: 1.0
+        });
+      }
+    }
+
+    function addFloatingText(x, y, text, color = '#10b981') {
+      floatingTexts.push({ x, y, text, color, life: 1.0 });
+    }
+
+    // 根據目前分數計算難度等級與場景主題
+    function getDifficultyStage() {
+      if (score < 250)  return { level: 1, label: 'Lv.1 草原', theme: 'day' };
+      if (score < 600)  return { level: 2, label: 'Lv.2 荒野', theme: 'day' };
+      if (score < 1050) return { level: 3, label: 'Lv.3 黃昏', theme: 'sunset' };
+      if (score < 1600) return { level: 4, label: 'Lv.4 暗夜', theme: 'night' };
+      return { level: 5, label: 'Lv.MAX 修羅', theme: 'night' };
+    }
+
+    // 生成障礙物、怪物、彈幕敵人與炸藥桶
+    function spawnEntity() {
+      const stage = getDifficultyStage();
+      const rand = Math.random();
+      const uid = entityUidCounter++;
+
+      if (rand < 0.22) {
+        // 堅硬不可摧毀障礙物（仙人掌 / 巨石）
+        const isRock = Math.random() < 0.45;
+        entities.push({
+          uid,
+          kind: 'solid',
+          emoji: isRock ? '🪨' : '🌵',
+          x: canvas.width + 20,
+          y: GROUND_Y - 46,
+          w: 44,
+          h: 46,
+          vxOffset: 0,
+          hp: 999,
+          destructible: false,
+          points: 0
+        });
+      } else if (rand < 0.36) {
+        // 可射擊木箱
+        entities.push({
+          uid,
+          kind: 'crate',
+          emoji: '📦',
+          x: canvas.width + 20,
+          y: GROUND_Y - 44,
+          w: 44,
+          h: 44,
+          vxOffset: 0,
+          hp: 1,
+          destructible: true,
+          points: 20
+        });
+      } else if (rand < 0.48) {
+        // 連鎖炸藥桶（擊爆可消滅周圍敵人）
+        entities.push({
+          uid,
+          kind: 'barrel',
+          emoji: '🛢️',
+          x: canvas.width + 20,
+          y: GROUND_Y - 46,
+          w: 42,
+          h: 46,
+          vxOffset: 0,
+          hp: 1,
+          destructible: true,
+          points: 35
+        });
+      } else if (rand < 0.68) {
+        // 地面衝刺怪物
+        const isOni = Math.random() < 0.5;
+        entities.push({
+          uid,
+          kind: 'ground_monster',
+          emoji: isOni ? '👹' : '👾',
+          x: canvas.width + 20,
+          y: GROUND_Y - 48,
+          w: 46,
+          h: 48,
+          vxOffset: 1.3 + stage.level * 0.25,
+          hp: 1,
+          destructible: true,
+          points: 30
+        });
+      } else if (rand < 0.84) {
+        // 飛行怪物（高空/低空波浪飛行）
+        const isHigh = Math.random() < 0.5;
+        const flyY = isHigh ? GROUND_Y - 102 : GROUND_Y - 58;
+        entities.push({
+          uid,
+          kind: 'flying_monster',
+          emoji: Math.random() < 0.5 ? '🦇' : '👻',
+          x: canvas.width + 20,
+          y: flyY,
+          baseY: flyY,
+          w: 44,
+          h: 42,
+          vxOffset: 1.7 + stage.level * 0.25,
+          hp: 1,
+          destructible: true,
+          points: 40,
+          waveOffset: Math.random() * Math.PI * 2
+        });
+      } else if (rand < 0.93 && stage.level >= 2) {
+        // 🛸 外星幽浮（會發射電漿彈幕）
+        entities.push({
+          uid,
+          kind: 'ufo',
+          emoji: '🛸',
+          x: canvas.width + 20,
+          y: GROUND_Y - 115,
+          baseY: GROUND_Y - 115,
+          w: 50,
+          h: 44,
+          vxOffset: 0.9,
+          hp: 2,
+          maxHp: 2,
+          destructible: true,
+          points: 70,
+          shootCooldown: 75,
+          waveOffset: Math.random() * Math.PI * 2
+        });
+      } else {
+        // 🐉 噴火龍 / 🤖 機械暴龍（高血量菁英怪）
+        const isCyber = stage.level >= 3 && Math.random() < 0.5;
+        entities.push({
+          uid,
+          kind: isCyber ? 'cyber_rex' : 'dragon',
+          emoji: isCyber ? '🤖' : '🐉',
+          x: canvas.width + 20,
+          y: GROUND_Y - 62,
+          w: 58,
+          h: 62,
+          vxOffset: 0.7 + stage.level * 0.15,
+          hp: isCyber ? 3 : 2,
+          maxHp: isCyber ? 3 : 2,
+          destructible: true,
+          points: isCyber ? 100 : 80,
+          shootCooldown: isCyber ? 85 : 9999
+        });
+      }
+
+      // 同時機率生成金幣列或強化道具
+      if (Math.random() < 0.55) {
+        spawnCollectibleLine();
+      }
+    }
+
+    function spawnCollectibleLine() {
+      const r = Math.random();
+      if (r < 0.22) {
+        // 生成強化道具（護盾 / 三向散射 / 磁鐵）
+        const types = [
+          { kind: 'shield', emoji: '🛡️' },
+          { kind: 'triple', emoji: '🔥' },
+          { kind: 'magnet', emoji: '🧲' }
+        ];
+        const chosen = types[Math.floor(Math.random() * types.length)];
+        collectibles.push({
+          kind: chosen.kind,
+          emoji: chosen.emoji,
+          x: canvas.width + 60,
+          y: GROUND_Y - 88 - Math.random() * 45,
+          r: 18
+        });
+      } else {
+        // 生成 3~4 顆弧形金幣
+        const count = 3 + Math.floor(Math.random() * 2);
+        const startX = canvas.width + 50;
+        const arcH = Math.random() < 0.5 ? 55 : 105;
+        for (let i = 0; i < count; i++) {
+          collectibles.push({
+            kind: 'coin',
+            emoji: '🪙',
+            x: startX + i * 34,
+            y: GROUND_Y - arcH - Math.sin((i / (count - 1)) * Math.PI) * 28,
+            r: 14
+          });
+        }
+      }
+    }
+
+    function checkRectCollision(a, b) {
+      return (
+        a.x < b.x + b.w &&
+        a.x + a.w > b.x &&
+        a.y < b.y + b.h &&
+        a.y + a.h > b.y
+      );
+    }
+
+    // 繪製多層次動態背景（支援白天、黃昏、暗夜切換）
+    function drawBackground() {
+      const stage = gameState === 'PLAYING' ? getDifficultyStage() : { theme: 'day' };
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+
+      if (stage.theme === 'night') {
+        skyGrad.addColorStop(0, '#0f172a');
+        skyGrad.addColorStop(1, '#1e293b');
+      } else if (stage.theme === 'sunset') {
+        skyGrad.addColorStop(0, '#fb7185');
+        skyGrad.addColorStop(0.55, '#fdba74');
+        skyGrad.addColorStop(1, '#fef3c7');
+      } else {
+        skyGrad.addColorStop(0, '#bae6fd');
+        skyGrad.addColorStop(1, '#f0f9ff');
+      }
+
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, canvas.width, GROUND_Y);
+
+      // 夜晚星光與月亮
+      if (stage.theme === 'night') {
+        ctx.fillStyle = '#ffffff';
+        stars.forEach(s => {
+          const alpha = 0.4 + 0.6 * Math.abs(Math.sin(frameCount * 0.05 + s.twinkle));
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(740, 75, 24, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // 白天 / 黃昏太陽
+        ctx.fillStyle = stage.theme === 'sunset' ? '#fef08a' : '#fde047';
+        ctx.beginPath();
+        ctx.arc(740, stage.theme === 'sunset' ? 140 : 75, 28, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(253, 224, 71, 0.25)';
+        ctx.beginPath();
+        ctx.arc(740, stage.theme === 'sunset' ? 140 : 75, 42, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 遠山視差捲動
+      const bgSpeed = gameState === 'PLAYING' ? gameSpeed * 0.2 : 0.4;
+      mountains.forEach((m, idx) => {
+        m.x -= bgSpeed;
+        if (m.x + m.w < 0) m.x = canvas.width;
+        if (stage.theme === 'night') {
+          ctx.fillStyle = idx % 2 === 0 ? '#1e293b' : '#334155';
+        } else if (stage.theme === 'sunset') {
+          ctx.fillStyle = idx % 2 === 0 ? '#f97316' : '#ea580c';
+        } else {
+          ctx.fillStyle = idx % 2 === 0 ? '#bae6fd' : '#93c5fd';
+        }
+        ctx.beginPath();
+        ctx.moveTo(m.x, GROUND_Y);
+        ctx.lineTo(m.x + m.w * 0.5, GROUND_Y - m.h);
+        ctx.lineTo(m.x + m.w, GROUND_Y);
+        ctx.closePath();
+        ctx.fill();
+      });
+
+      // 雲朵捲動
+      const cloudSprite = getEmojiSprite('☁️', 36, false);
+      clouds.forEach(c => {
+        c.x -= c.speed + (gameState === 'PLAYING' ? gameSpeed * 0.08 : 0.2);
+        if (c.x < -80) c.x = canvas.width + 60;
+        ctx.save();
+        ctx.globalAlpha = stage.theme === 'night' ? 0.35 : 0.9;
+        ctx.drawImage(cloudSprite, c.x, c.y - 20, cloudSprite.width * c.scale, cloudSprite.height * c.scale);
+        ctx.restore();
+      });
+
+      // 地面草皮與土層
+      ctx.fillStyle = stage.theme === 'night' ? '#15803d' : '#4ade80';
+      ctx.fillRect(0, GROUND_Y, canvas.width, 10);
+
+      ctx.fillStyle = stage.theme === 'night' ? '#44403c' : '#d6d3d1';
+      ctx.fillRect(0, GROUND_Y + 10, canvas.width, canvas.height - GROUND_Y - 10);
+
+      // 地面小石子滾動
+      const groundRollSpeed = gameState === 'PLAYING' ? gameSpeed : 2.5;
+      ctx.fillStyle = stage.theme === 'night' ? '#78716c' : '#a8a29e';
+      groundPebbles.forEach(p => {
+        p.x -= groundRollSpeed;
+        if (p.x + p.w < 0) p.x = canvas.width + Math.random() * 30;
+        ctx.fillRect(p.x, p.y, p.w, 3);
+      });
+    }
+
+    // 炸藥桶連鎖引爆效果
+    function triggerBarrelExplosion(cx, cy) {
+      AudioSys.play('boom');
+      screenShake = 14;
+      spawnParticles(cx, cy, '#ef4444', 22);
+      spawnParticles(cx, cy, '#f59e0b', 16);
+      addFloatingText(cx, cy - 20, '💥 BOOM! 清場!', '#ef4444');
+
+      const blastRadius = 210;
+      for (let i = entities.length - 1; i >= 0; i--) {
+        const other = entities[i];
+        if (!other.destructible) continue;
+        const dist = Math.hypot((other.x + other.w / 2) - cx, (other.y + other.h / 2) - cy);
+        if (dist <= blastRadius) {
+          score += other.points;
+          kills++;
+          combo++;
+          maxCombo = Math.max(maxCombo, combo);
+          spawnParticles(other.x + other.w / 2, other.y + other.h / 2, '#f97316', 10);
+          entities.splice(i, 1);
+        }
+      }
+    }
+
+    function handlePlayerDamage() {
+      if (player.invincibleTimer > 0) return;
+
+      if (player.hasShield) {
+        player.hasShield = false;
+        player.invincibleTimer = 55;
+        screenShake = 10;
+        AudioSys.play('shield_break');
+        spawnParticles(player.x + player.w / 2, player.y + player.h / 2, '#38bdf8', 18);
+        addFloatingText(player.x + 25, player.y - 12, '🛡️ 護盾抵擋!', '#0284c7');
+        return;
+      }
+
+      triggerGameOver();
+    }
+
+    function updateAndDrawGame() {
+      frameCount++;
+
+      ctx.save();
+      if (screenShake > 0) {
+        const dx = (Math.random() - 0.5) * screenShake;
+        const dy = (Math.random() - 0.5) * screenShake;
+        ctx.translate(dx, dy);
+        screenShake *= 0.85;
+        if (screenShake < 0.5) screenShake = 0;
+      }
+
+      drawBackground();
+
+      if (gameState === 'PLAYING') {
+        const stage = getDifficultyStage();
+        difficultyBadge.textContent = stage.label;
+
+        // 強化狀態列更新
+        const activeBuffs = [];
+        if (player.hasShield) activeBuffs.push('🛡️護盾');
+        if (player.tripleShotTimer > 0) activeBuffs.push(`🔥散射 ${Math.ceil(player.tripleShotTimer / 60)}s`);
+        if (player.magnetTimer > 0) activeBuffs.push(`🧲磁鐵 ${Math.ceil(player.magnetTimer / 60)}s`);
+
+        if (activeBuffs.length > 0) {
+          buffBadge.textContent = activeBuffs.join(' | ');
+          buffBadge.classList.remove('hidden');
+        } else {
+          buffBadge.classList.add('hidden');
+        }
+
+        // Combo 倍率顯示
+        const multiplier = Math.min(5, 1 + Math.floor(combo / 3));
+        if (combo > 1) {
+          comboDisplay.textContent = `COMBO x${multiplier}`;
+          comboDisplay.classList.remove('hidden');
+        } else {
+          comboDisplay.classList.add('hidden');
+        }
+
+        // 隨分數漸進加速
+        gameSpeed = Math.min(14.5, 6.2 + score * 0.0022);
+        score += 0.16;
+        const displayScore = Math.floor(score);
+        currentScoreEl.textContent = String(displayScore).padStart(5, '0');
+
+        if (displayScore > highScore) {
+          highScore = displayScore;
+          highScoreEl.textContent = String(highScore).padStart(5, '0');
+        }
+
+        // 生成障礙物與怪物
+        spawnTimer--;
+        if (spawnTimer <= 0) {
+          spawnEntity();
+          const minGap = Math.max(42, 88 - gameSpeed * 3.1);
+          spawnTimer = minGap + Math.random() * 40;
+        }
+      }
+
+      // 更新並繪製金幣與強化道具
+      const pCenterX = player.x + player.w / 2;
+      const pCenterY = player.y + player.h / 2;
+
+      for (let i = collectibles.length - 1; i >= 0; i--) {
+        const c = collectibles[i];
+
+        if (gameState === 'PLAYING') {
+          c.x -= gameSpeed;
+
+          // 磁鐵自動吸取金幣
+          if (player.magnetTimer > 0 && c.kind === 'coin') {
+            const dx = pCenterX - c.x;
+            const dy = pCenterY - c.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 260 && dist > 1) {
+              c.x += (dx / dist) * 9.5;
+              c.y += (dy / dist) * 9.5;
+            }
+          }
+        }
+
+        const cSprite = getEmojiSprite(c.emoji, 28, false);
+        const floatY = Math.sin(frameCount * 0.15 + i) * 3;
+        ctx.drawImage(cSprite, c.x - cSprite.width / 2, c.y + floatY - cSprite.height / 2);
+
+        if (gameState === 'PLAYING') {
+          const distToPlayer = Math.hypot(c.x - pCenterX, c.y - pCenterY);
+          if (distToPlayer < 36) {
+            if (c.kind === 'coin') {
+              AudioSys.play('coin');
+              combo++;
+              maxCombo = Math.max(maxCombo, combo);
+              const mult = Math.min(5, 1 + Math.floor(combo / 3));
+              const gain = 10 * mult;
+              score += gain;
+              spawnParticles(c.x, c.y, '#facc15', 6);
+              addFloatingText(c.x, c.y - 10, `+${gain}`, '#eab308');
+            } else if (c.kind === 'shield') {
+              AudioSys.play('powerup');
+              player.hasShield = true;
+              spawnParticles(c.x, c.y, '#38bdf8', 12);
+              addFloatingText(c.x, c.y - 12, '🛡️ 獲得能量護盾!', '#0284c7');
+            } else if (c.kind === 'triple') {
+              AudioSys.play('powerup');
+              player.tripleShotTimer = 480;
+              spawnParticles(c.x, c.y, '#f97316', 12);
+              addFloatingText(c.x, c.y - 12, '🔥 三向散射火力!', '#ea580c');
+            } else if (c.kind === 'magnet') {
+              AudioSys.play('powerup');
+              player.magnetTimer = 540;
+              spawnParticles(c.x, c.y, '#f43f5e', 12);
+              addFloatingText(c.x, c.y - 12, '🧲 超級磁鐵啟動!', '#e11d48');
+            }
+            collectibles.splice(i, 1);
+            continue;
+          }
+        }
+
+        if (c.x < -40) collectibles.splice(i, 1);
+      }
+
+      // 更新並繪製玩家子彈
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+
+        const bSprite = getEmojiSprite(b.emoji, 24, false);
+        ctx.drawImage(bSprite, b.x - bSprite.width / 2, b.y - bSprite.height / 2);
+
+        if (b.x > canvas.width + 30 || b.y < -20 || b.y > canvas.height + 20) {
+          bullets.splice(i, 1);
+        }
+      }
+
+      // 更新並繪製敵人發射的彈幕
+      const pBox = player.getHitbox();
+      for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+        const ep = enemyProjectiles[i];
+        if (gameState === 'PLAYING') {
+          ep.x += ep.vx;
+          ep.y += ep.vy;
+        }
+
+        const epSprite = getEmojiSprite(ep.emoji, 24, false);
+        ctx.drawImage(epSprite, ep.x - epSprite.width / 2, ep.y - epSprite.height / 2);
+
+        if (gameState === 'PLAYING') {
+          const epBox = { x: ep.x - 9, y: ep.y - 9, w: 18, h: 18 };
+          if (checkRectCollision(pBox, epBox)) {
+            enemyProjectiles.splice(i, 1);
+            handlePlayerDamage();
+            continue;
+          }
+        }
+
+        if (ep.x < -30 || ep.y > GROUND_Y) {
+          enemyProjectiles.splice(i, 1);
+        }
+      }
+
+      // 更新並繪製障礙物與怪物
+      for (let i = entities.length - 1; i >= 0; i--) {
+        const e = entities[i];
+
+        if (gameState === 'PLAYING') {
+          e.x -= (gameSpeed + e.vxOffset);
+          if (e.kind === 'flying_monster' || e.kind === 'ufo') {
+            e.y = e.baseY + Math.sin(frameCount * 0.12 + e.waveOffset) * 11;
+          }
+
+          // 🛸 幽浮與 🤖 機械暴龍遠距離發射彈幕
+          if ((e.kind === 'ufo' || e.kind === 'cyber_rex') && e.x < canvas.width - 80 && e.x > 220) {
+            e.shootCooldown--;
+            if (e.shootCooldown <= 0) {
+              e.shootCooldown = e.kind === 'ufo' ? 95 : 105;
+              enemyProjectiles.push({
+                emoji: e.kind === 'ufo' ? '🟣' : '🔥',
+                x: e.x,
+                y: e.y + e.h / 2,
+                vx: -(gameSpeed + 3.2),
+                vy: e.kind === 'ufo' ? 2.4 : 0
+              });
+            }
+          }
+        }
+
+        // 使用離屏清晰快取繪製怪物與障礙物
+        const eSprite = getEmojiSprite(e.emoji, e.h, false);
+        ctx.drawImage(eSprite, e.x + e.w / 2 - eSprite.width / 2, e.y + e.h / 2 - eSprite.height / 2);
+
+        // 菁英怪血條顯示
+        if (e.maxHp && e.maxHp > 1) {
+          const barW = 42;
+          const barX = e.x + (e.w - barW) / 2;
+          const barY = e.y - 10;
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(barX, barY, barW, 5);
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(barX, barY, barW * (e.hp / e.maxHp), 5);
+        }
+
+        // 檢查玩家子彈碰撞
+        let destroyed = false;
+        for (let j = bullets.length - 1; j >= 0; j--) {
+          const b = bullets[j];
+          if (b.hitIds.has(e.uid)) continue;
+
+          if (
+            b.x + b.r > e.x + 4 &&
+            b.x - b.r < e.x + e.w - 4 &&
+            b.y + b.r > e.y + 4 &&
+            b.y - b.r < e.y + e.h - 4
+          ) {
+            b.hitIds.add(e.uid);
+            if (!b.pierce) {
+              bullets.splice(j, 1);
+            }
+
+            if (!e.destructible) {
+              AudioSys.play('clang');
+              spawnParticles(b.x, b.y, '#cbd5e1', 6);
+              addFloatingText(e.x + 12, e.y - 8, '堅硬!', '#64748b');
+            } else {
+              e.hp -= b.damage;
+              spawnParticles(b.x, b.y, '#f59e0b', 8);
+
+              if (e.hp <= 0) {
+                const cx = e.x + e.w / 2;
+                const cy = e.y + e.h / 2;
+                const wasBarrel = e.kind === 'barrel';
+
+                combo++;
+                maxCombo = Math.max(maxCombo, combo);
+                const mult = Math.min(5, 1 + Math.floor(combo / 3));
+                const gained = e.points * mult;
+                score += gained;
+                kills += 1;
+
+                entities.splice(i, 1);
+                destroyed = true;
+
+                if (wasBarrel) {
+                  triggerBarrelExplosion(cx, cy);
+                } else {
+                  AudioSys.play('hit');
+                  screenShake = 6;
+                  spawnParticles(cx, cy, '#ef4444', 14);
+                  addFloatingText(cx, e.y, `+${gained}`, '#16a34a');
+                }
+              } else {
+                AudioSys.play('hit');
+                addFloatingText(e.x + e.w / 2, e.y - 12, 'HIT!', '#f97316');
+              }
+            }
+            break;
+          }
+        }
+
+        if (destroyed) continue;
+
+        // 檢查玩家與實體碰撞
+        if (gameState === 'PLAYING') {
+          const eBox = { x: e.x + 8, y: e.y + 8, w: e.w - 16, h: e.h - 14 };
+          if (checkRectCollision(pBox, eBox)) {
+            entities.splice(i, 1);
+            handlePlayerDamage();
+            continue;
+          }
+        }
+
+        if (e.x + e.w < -45) {
+          if (e.destructible && gameState === 'PLAYING') {
+            combo = 0;
+          }
+          entities.splice(i, 1);
+        }
+      }
+
+      // 更新並繪製玩家角色
+      player.update();
+      player.draw();
+
+      // 更新並繪製粒子特效
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.vy += 0.25;
+        pt.life -= 0.04;
+        if (pt.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        ctx.save();
+        ctx.globalAlpha = pt.life;
+        ctx.fillStyle = pt.color;
+        ctx.fillRect(pt.x, pt.y, pt.size, pt.size);
+        ctx.restore();
+      }
+
+      // 更新並繪製浮動得分提示
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.y -= 1.25;
+        ft.life -= 0.024;
+        if (ft.life <= 0) {
+          floatingTexts.splice(i, 1);
+          continue;
+        }
+        ctx.save();
+        ctx.globalAlpha = ft.life;
+        ctx.font = 'bold 15px "Noto Sans TC", sans-serif';
+        ctx.fillStyle = ft.color;
+        ctx.textAlign = 'center';
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      }
+
+      ctx.restore();
+      requestAnimationFrame(updateAndDrawGame);
+    }
+
+    // 遊戲流程控制函式
+    function startGame() {
+      gameState = 'PLAYING';
+      score = 0;
+      kills = 0;
+      combo = 0;
+      maxCombo = 0;
+      gameSpeed = 6.2;
+      bullets = [];
+      enemyProjectiles = [];
+      entities = [];
+      collectibles = [];
+      particles = [];
+      floatingTexts = [];
+      spawnTimer = 45;
+      player.reset();
+
+      startScreen.classList.add('hidden');
+      gameoverScreen.classList.add('hidden');
+      btnHudMenu.classList.remove('hidden');
+      difficultyBadge.classList.remove('hidden');
+    }
+
+    function triggerGameOver() {
+      gameState = 'GAMEOVER';
+      screenShake = 14;
+      AudioSys.play('gameover');
+      const finalScoreVal = Math.floor(score);
+      const stageLabel = difficultyBadge.textContent;
+      finalScoreEl.textContent = finalScoreVal;
+      finalKillsEl.textContent = kills;
+      finalComboEl.textContent = `x${Math.min(5, 1 + Math.floor(maxCombo / 3))}`;
+      finalStageEl.textContent = `抵達階段：${stageLabel}`;
+      gameoverScreen.classList.remove('hidden');
+      btnHudMenu.classList.add('hidden');
+      buffBadge.classList.add('hidden');
+
+      submitScoreToSheet(finalScoreVal, stageLabel);
+    }
+
+    function returnToMenu() {
+      gameState = 'MENU';
+      bullets = [];
+      enemyProjectiles = [];
+      entities = [];
+      collectibles = [];
+      particles = [];
+      floatingTexts = [];
+      player.reset();
+
+      gameoverScreen.classList.add('hidden');
+      btnHudMenu.classList.add('hidden');
+      difficultyBadge.classList.add('hidden');
+      buffBadge.classList.add('hidden');
+      comboDisplay.classList.add('hidden');
+      startScreen.classList.remove('hidden');
+    }
+
+    // 角色選擇切換
+    charButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedCharKey = btn.dataset.char;
+        charButtons.forEach(b => {
+          b.classList.remove('border-blue-500', 'bg-blue-50');
+          b.classList.add('border-slate-200', 'bg-slate-50');
+        });
+        btn.classList.remove('border-slate-200', 'bg-slate-50');
+        btn.classList.add('border-blue-500', 'bg-blue-50');
+      });
+    });
+
+    // 按鈕事件綁定
+    btnStart.addEventListener('click', startGame);
+    btnRestart.addEventListener('click', startGame);
+    btnBackMenu.addEventListener('click', returnToMenu);
+    btnHudMenu.addEventListener('click', returnToMenu);
+
+    // 排行榜視窗開關
+    function openLeaderboardModal() {
+      leaderboardModal.classList.remove('hidden');
+      fetchLeaderboard();
+    }
+
+    btnOpenLeaderboard.addEventListener('click', openLeaderboardModal);
+    btnGameoverBoard.addEventListener('click', openLeaderboardModal);
+    btnCloseLeaderboard.addEventListener('click', () => leaderboardModal.classList.add('hidden'));
+    btnRefreshBoard.addEventListener('click', fetchLeaderboard);
+
+    // 隱藏管理視窗開關與密技觸發（連點標題/獎盃 5 下、快捷鍵 Ctrl+Shift+A、或網址加上 ?admin=1）
+    function openAdminModal() {
+      sheetUrlInput.value = GOOGLE_SHEET_API_URL;
+      adminModal.classList.remove('hidden');
+    }
+
+    btnCloseAdmin.addEventListener('click', () => adminModal.classList.add('hidden'));
+
+    let secretClickCount = 0;
+    let secretClickTimer = null;
+    function handleSecretTrigger() {
+      secretClickCount++;
+      clearTimeout(secretClickTimer);
+      secretClickTimer = setTimeout(() => { secretClickCount = 0; }, 1500);
+      if (secretClickCount >= 5) {
+        secretClickCount = 0;
+        openAdminModal();
+      }
+    }
+    gameMainTitle.addEventListener('click', handleSecretTrigger);
+    leaderboardSecretTrigger.addEventListener('click', handleSecretTrigger);
+
+    if (new URLSearchParams(window.location.search).get('admin') === '1') {
+      openAdminModal();
+    }
+
+    btnApplySheetUrl.addEventListener('click', () => {
+      const val = sheetUrlInput.value.trim();
+      if (!val.startsWith('https://script.google.com/')) {
+        urlApplyFeedback.textContent = '❌ 請輸入正確的 https://script.google.com/.../exec 網址！';
+        urlApplyFeedback.className = 'text-[11px] font-bold text-rose-600';
+        return;
+      }
+      GOOGLE_SHEET_API_URL = val;
+      urlApplyFeedback.textContent = '✅ 網址已套用！正在同步試算表資料...';
+      urlApplyFeedback.className = 'text-[11px] font-bold text-emerald-700';
+      fetchLeaderboard();
+    });
+
+    // 一鍵複製 Google Apps Script 程式碼
+    btnCopyGas.addEventListener('click', () => {
+      gasCodeBox.select();
+      gasCodeBox.setSelectionRange(0, 99999);
+      try {
+        document.execCommand('copy');
+        btnCopyGas.textContent = '✅ 已複製到剪貼簿！';
+        setTimeout(() => { btnCopyGas.textContent = '📋 一鍵複製程式碼'; }, 2000);
+      } catch (e) {
+        btnCopyGas.textContent = '請手動全選複製';
+      }
+    });
+
+    btnMute.addEventListener('click', () => {
+      isMuted = !isMuted;
+      btnMute.textContent = isMuted ? '🔇 靜音中' : '🔊 音效開';
+    });
+
+    // 鍵盤操作
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyA') {
+        e.preventDefault();
+        openAdminModal();
+        return;
+      }
+      if (document.activeElement === playerNicknameInput || document.activeElement === sheetUrlInput) {
+        return;
+      }
+      if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) {
+        e.preventDefault();
+      }
+
+      if (gameState === 'PLAYING') {
+        if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+          player.jump();
+        } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+          player.setDuck(true);
+        } else if (e.code === 'KeyZ' || e.code === 'KeyF' || e.code === 'Enter') {
+          player.shoot();
+        }
+      } else if (gameState === 'GAMEOVER' && e.code === 'Space' && leaderboardModal.classList.contains('hidden') && adminModal.classList.contains('hidden')) {
+        startGame();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+        player.setDuck(false);
+      }
+    });
+
+    // 畫布點擊射擊
+    canvas.addEventListener('pointerdown', () => {
+      if (gameState === 'PLAYING') {
+        player.shoot();
+      }
+    });
+
+    // 手機版觸控按鈕
+    const touchJump = document.getElementById('touch-jump');
+    const touchDuck = document.getElementById('touch-duck');
+    const touchShoot = document.getElementById('touch-shoot');
+
+    touchJump.addEventListener('pointerdown', (e) => { e.preventDefault(); player.jump(); });
+    touchShoot.addEventListener('pointerdown', (e) => { e.preventDefault(); player.shoot(); });
+    touchDuck.addEventListener('pointerdown', (e) => { e.preventDefault(); player.setDuck(true); });
+    touchDuck.addEventListener('pointerup', (e) => { e.preventDefault(); player.setDuck(false); });
+    touchDuck.addEventListener('pointerleave', () => player.setDuck(false));
+
+    // 啟動遊戲渲染迴圈並初始化排行榜
+    window.onload = function () {
+      fetchLeaderboard();
+      requestAnimationFrame(updateAndDrawGame);
+    };
+  </script>
+</body>
+</html>
